@@ -36,7 +36,7 @@ final class Config
     /** Hinweisbanner über allen Seiten; per 'banner' => '' in config.php abschaltbar. */
     public const DEFAULT_BANNER = 'Privates Wein-Wichteln der WhatsApp-Gruppe – keine Aktion von Lobenbergs Gute Weine.';
 
-    public const RESERVED_SLUGS = ['admin', 'style.css', 'healthz', 'tasks', 'datenschutz', 'impressum', 'index.php', 'fonts', 'favicon.ico', 'favicon.svg', 'favicon-32.png', 'apple-touch-icon.png', 'og-image.png'];
+    public const RESERVED_SLUGS = ['admin', 'style.css', 'healthz', 'tasks', 'datenschutz', 'impressum', 'index.php', 'fonts', 'favicon.ico', 'favicon.svg', 'favicon-32.png', 'apple-touch-icon.png', 'og-image.png', 'img'];
 
     public function __construct(
         /** @var Round[] */

@@ -154,7 +154,7 @@ final class Views
                 . e($s->round->countryName) . '</strong></span><span><span class="meta">' . e($state) . '</span><br><span class="go">'
                 . ($s->isRegistrationOpen() ? 'Jetzt mitmachen' : 'Zur Runde') . '</span></span></a></li>';
         }
-        $hero = '<section class="hero"><div class="wrap">
+        $hero = '<section class="hero hero-photo"><div class="wrap">
       <span class="kicker">Wein-Wichteln per Post</span>
       <h1>Eine Flasche.<br>Ein Los.<br>Eine Überraschung.</h1>
       <p>Melde Dich an, bekomme einen Wichtelpartner zugelost und verschicke eine Flasche Wein, die Du selbst gern trinken würdest. Und dann: Lass Dich überraschen.</p>

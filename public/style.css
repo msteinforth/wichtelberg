@@ -49,6 +49,16 @@ nav a:hover,button.link:hover{color:var(--fg-strong)}
 .hero h1{font-family:var(--serif);font-weight:500;font-size:clamp(2.2rem,5vw,3.4rem);line-height:1.1;margin:.4rem 0 1rem;color:#fff;max-width:20ch}
 .hero p{max-width:38rem;color:#e9e4dc;font-size:1.05rem}
 .hero .kicker{color:#c9c1b6}
+/* Startseite: Foto mit halbtransparenter Ebene – links dunkler für den Text, rechts heller fürs Motiv */
+.hero-photo{position:relative;background:#1c1918 url(img/hero-wichtel.webp) 62% 40%/cover no-repeat}
+.hero-photo::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(28,25,24,.88) 0%,rgba(28,25,24,.72) 45%,rgba(28,25,24,.38) 100%)}
+.hero-photo .wrap{position:relative;padding-top:5rem;padding-bottom:5rem}
+.hero-photo h1,.hero-photo p{text-shadow:0 1px 12px rgba(0,0,0,.45)}
+@media (max-width:40rem){
+  .hero-photo{background-image:url(img/hero-wichtel-900.webp);background-position:58% 30%}
+  .hero-photo::before{background:rgba(28,25,24,.7)}
+  .hero-photo .wrap{padding-top:3.5rem;padding-bottom:3.5rem}
+}
 .kicker{display:block;text-transform:uppercase;letter-spacing:.09em;font-size:.82rem;color:var(--muted);margin:0}
 .tagline{text-align:center;padding:1.25rem 0;border-bottom:1px solid var(--line)}
 
