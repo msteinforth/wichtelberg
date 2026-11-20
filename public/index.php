@@ -13,10 +13,12 @@ if (PHP_SAPI === 'cli-server' && is_file(__DIR__ . parse_url($_SERVER['REQUEST_U
 try {
     $config = Config::load(Bootstrap::configPath());
 } catch (ConfigError $e) {
+    // Ohne Shell-Zugang (Strato-Webhosting) ist das die einzige Stelle, an der man Konfigurationsfehler sieht.
+    // Die Meldungen nennen nur Feldnamen und Regeln, niemals Werte von Schlüsseln.
     error_log($e->getMessage());
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
-    exit("Wichtelberg ist nicht korrekt konfiguriert. Details stehen im Fehlerlog (oder: php cli.php check).\n");
+    exit("Wichtelberg ist noch nicht korrekt konfiguriert (config.php).\n\n" . $e->getMessage() . "\n");
 }
 
 $app = Bootstrap::app($config);

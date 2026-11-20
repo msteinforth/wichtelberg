@@ -59,7 +59,7 @@ final class Config
     public static function load(string $path): self
     {
         if (!is_file($path)) {
-            throw new ConfigError("Konfigurationsdatei $path nicht gefunden. Vorlage: config.example.php");
+            throw new ConfigError("Konfigurationsdatei " . basename($path) . " nicht gefunden. Vorlage: config.example.php (./deploy.sh config)");
         }
         $raw = require $path;
         if (!is_array($raw)) {
@@ -89,7 +89,7 @@ final class Config
     private static function decodeKey(mixed $value, string $name, array &$errors): ?string
     {
         if (!is_string($value) || $value === '') {
-            $errors[] = "secrets.$name fehlt (64 Hex-Zeichen). Erzeugen mit: php cli.php keys";
+            $errors[] = "secrets.$name fehlt (64 Hex-Zeichen). Erzeugen mit: ./deploy.sh config";
             return null;
         }
         if (!preg_match('/^[0-9a-fA-F]{64}$/', $value)) {

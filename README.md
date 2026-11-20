@@ -18,46 +18,47 @@ src/             Anwendung (nicht per Web erreichbar)
 data/            verschlüsselte Datendateien, Backups, Rate-Limit (wird angelegt; per .htaccess gesperrt)
 config.php       Konfiguration inkl. Schlüssel (aus config.example.php; nicht im Repository)
 cron.php         Cronjob: fällige Aufgaben ausführen
-cli.php          php cli.php keys | check | tasks | status
-deploy.sh        Upload auf den Strato-Webspace per SSH
+cli.php          php cli.php keys | check | tasks | status (lokal oder mit Shell-Zugang)
+deploy.sh        config.php erzeugen und per SFTP auf den Strato-Webspace hochladen
 tests/           php tests/run.php
 ```
 
 ## Installation auf Strato
 
-1. **Hochladen** (auf Deinem Rechner, das Passwort fragt ssh ab):
+Der Strato-Zugang erlaubt **nur SFTP**, keine Shell. Darum wird alles auf dem eigenen Rechner vorbereitet
+und per SFTP hochgeladen. Konfigurationsfehler zeigt die Website direkt an.
+
+1. **Konfiguration erzeugen** (einmalig, im Projektordner auf Deinem Rechner):
+   ```bash
+   ./deploy.sh config
+   ```
+   Das legt `config.php` mit neuen Schlüsseln an (per `openssl`, das macOS mitbringt). Danach in `config.php`
+   Organisator, Absender (`mail.from`), Rechtstexte und Fristen anpassen.
+   **`config.php` sicher aufbewahren**: Sie ist nicht im Git-Repository, und ohne `data_key` sind die Daten verloren.
+2. **Hochladen** (fragt das Strato-Passwort ab):
    ```bash
    ./deploy.sh
    ```
-   Das Skript legt alles im Webspace-Ordner `wichtelberg/` ab. Statt des Skripts geht auch SFTP.
-2. **Konfigurieren** (per SSH auf dem Server):
-   ```bash
-   ssh stu111925250@58819075.ssh.w1.strato.hosting
-   ```
-   ```bash
-   cd wichtelberg && cp config.example.php config.php && php cli.php keys
-   ```
-   Die ausgegebenen Schlüssel in `config.php` unter `secrets` eintragen, dann Organisator, Absender, Rechtstexte und Fristen anpassen.
-   ```bash
-   php cli.php check
-   ```
+   Lädt `public/`, `src/`, die Skripte und `config.php` nach `wichtelberg/`. `data/` auf dem Server bleibt
+   unangetastet. Alternativ geht das auch mit einem SFTP-Programm (Cyberduck, FileZilla).
 3. **Domain**: Im Strato-Kundenbereich die (Sub-)Domain `wichtelberg.steinforth.com` auf das Verzeichnis
    `/wichtelberg/public` zeigen lassen. Falls sie auf `/wichtelberg` zeigt, funktioniert es dank `.htaccess`
    ebenfalls, und `src/`, `data/` und `config.php` bleiben gesperrt. SSL-Zertifikat für die Subdomain aktivieren.
 4. **PHP-Version**: Im Kundenbereich PHP 8.3 (mindestens 8.1) für die Domain wählen.
-5. **Cronjob** (falls im Paket enthalten): `wichtelberg/cron.php` alle 15 Minuten ausführen. Ohne Cronjob
+5. **Prüfen**: https://wichtelberg.steinforth.com aufrufen. Ist die Konfiguration fehlerhaft, stehen die Fehler
+   dort (ohne Schlüsselwerte).
+6. **Cronjob** (falls im Paket enthalten): `wichtelberg/cron.php` alle 15 Minuten ausführen. Ohne Cronjob
    übernimmt der eingebaute Web-Cron (`web_cron_seconds`): Fällige Aufgaben laufen dann beim nächsten
-   Seitenaufruf. Alternativ ein externer Dienst:
+   Seitenaufruf. Alternativ ein externer Cron-Dienst:
    ```bash
    curl -fsS -X POST -H "Authorization: Bearer <tasks_token>" https://wichtelberg.steinforth.com/tasks/run
    ```
-6. **E-Mail**: Am zuverlässigsten mit SMTP über ein Strato-Postfach der Domain (`mail.transport = 'smtp'`,
+7. **E-Mail**: Am zuverlässigsten mit SMTP über ein Strato-Postfach der Domain (`mail.transport = 'smtp'`,
    `smtp.strato.de`, Port 465). `mail()` funktioniert ebenfalls, wenn `mail.from` eine Adresse der Domain ist.
-   Für die Zustellbarkeit SPF/DKIM der Domain prüfen.
-7. **Testen**: Zunächst `mail.transport = 'log'` setzen. Mails landen dann in `data/mail.log`.
+8. **Testen**: Zunächst `mail.transport = 'log'` setzen. Mails landen dann in `data/mail.log`, das sich per SFTP
+   herunterladen lässt.
 
-**`data_key` gut aufbewahren.** Ohne ihn sind die Daten nicht lesbar. Updates einfach erneut mit `./deploy.sh`;
-`config.php` und `data/` werden dabei nicht überschrieben.
+Updates: Repository aktualisieren und erneut `./deploy.sh` ausführen.
 
 ## Ablauf
 
