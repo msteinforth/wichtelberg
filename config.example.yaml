@@ -1,0 +1,63 @@
+# Wichtelberg – Konfiguration
+# Kopieren nach config.yaml und anpassen. Secrets (SECRET_KEY, DATA_KEY, TASKS_TOKEN, SMTP_URL)
+# gehören NICHT hierher, sondern in Umgebungsvariablen (siehe deploy/wichtelberg.env.example).
+
+base_url: "https://wichtelberg.steinforth.com"
+organizer_email: "orga@example.org"   # erhält Absage-Mails und kann sich unter /admin anmelden
+trust_proxy: true                     # hinter nginx/Apache: echte Client-IP aus X-Forwarded-For
+data_dir: "./data"
+scheduler_interval_seconds: 60        # 0 = nur per Cron (POST /tasks/run)
+
+mail:
+  transport: smtp                     # "log" = Mails nur auf der Konsole ausgeben (Test)
+  from: "Wichtelberg <wichteln@steinforth.com>"
+
+legal:
+  operator: |
+    Vorname Nachname
+    Straße 1, 12345 Ort
+    E-Mail: orga@example.org
+  imprint: |
+    Angaben gemäß § 5 DDG:
+    Vorname Nachname
+    Straße 1, 12345 Ort
+    E-Mail: orga@example.org
+
+# Eine Runde pro Land. URL: base_url/<slug>, z. B. https://wichtelberg.steinforth.com/de
+# country: DE | AT | CH | IT   (bestimmt PLZ-Format und Versanddienstleister)
+rounds:
+  - slug: de
+    country: DE
+    name: "Wein-Wichteln Deutschland 2026"
+    description: "Eine Flasche im Wert von ca. 15–25 €."
+    registration_deadline: "2026-12-01T23:59:00+01:00"
+    shipping_deadline: "2026-12-10T23:59:00+01:00"
+    reminders: ["2026-12-08T10:00:00+01:00"]
+    reveal_at: "2026-12-24T12:00:00+01:00"   # optional, Standard: Versandfrist
+    min_participants: 3
+    max_participants: null
+    data_retention_days: 30                 # Löschung X Tage nach Versandfrist
+
+  - slug: at
+    country: AT
+    name: "Wein-Wichteln Österreich 2026"
+    description: "Eine Flasche im Wert von ca. 15–25 €."
+    registration_deadline: "2026-12-01T23:59:00+01:00"
+    shipping_deadline: "2026-12-10T23:59:00+01:00"
+    reminders: ["2026-12-08T10:00:00+01:00"]
+
+  - slug: ch
+    country: CH
+    name: "Wein-Wichteln Schweiz 2026"
+    description: "Eine Flasche im Wert von ca. 20–30 CHF."
+    registration_deadline: "2026-12-01T23:59:00+01:00"
+    shipping_deadline: "2026-12-10T23:59:00+01:00"
+    reminders: ["2026-12-08T10:00:00+01:00"]
+
+  - slug: it
+    country: IT
+    name: "Wein-Wichteln Italien 2026"
+    description: "Eine Flasche im Wert von ca. 15–25 €."
+    registration_deadline: "2026-12-01T23:59:00+01:00"
+    shipping_deadline: "2026-12-10T23:59:00+01:00"
+    reminders: ["2026-12-08T10:00:00+01:00"]

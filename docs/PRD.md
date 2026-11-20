@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Entwurf v0.2 (schlanke Architektur ohne Datenbank) |
+| **Status** | v0.3: schlanke Architektur ohne Datenbank, Länder-Runden DE/AT/CH/IT, optionale Aufdeckung |
+| **URL** | https://wichtelberg.steinforth.com |
 | **Datum** | 20.11.2026 |
 | **Produkttyp** | Web-Anwendung (responsive, mobile-first) |
 | **Sprache** | Deutsch |
@@ -11,9 +12,9 @@
 
 ## 1. Zusammenfassung
 
-Wichtelberg ist eine Web-Anwendung zur Organisation eines Wein-Wichtelns per Post. Teilnehmer melden sich bis zu einer festen Frist mit E-Mail-Adresse und einer Lieferadresse in Deutschland an. Nach Ablauf der Frist lost das System jedem Teilnehmer automatisch einen Wichtelpartner zu. Jeder Teilnehmer verschickt eine Flasche Wein an seinen Partner und hinterlegt Versanddienstleister und Sendungsnummer. Der Empfänger erhält daraufhin eine E-Mail mit dem Tracking-Link. Fehlt die Sendungsnummer bis zu einem Stichtag, verschickt das System eine Erinnerung.
+Wichtelberg ist eine Web-Anwendung zur Organisation eines Wein-Wichtelns per Post. Teilnehmer melden sich bis zu einer festen Frist mit E-Mail-Adresse und einer Lieferadresse an. Es gibt je eine Runde pro Land (Deutschland, Österreich, Schweiz, Italien); innerhalb einer Runde wird nur im Inland verschickt. Nach Ablauf der Frist lost das System jedem Teilnehmer automatisch einen Wichtelpartner zu. Jeder Teilnehmer verschickt eine Flasche Wein an seinen Partner und hinterlegt Versanddienstleister und Sendungsnummer. Der Empfänger erhält daraufhin eine E-Mail mit dem Tracking-Link. Fehlt die Sendungsnummer bis zu einem Stichtag, verschickt das System eine Erinnerung.
 
-**Leitprinzip: schlank.** Die App kommt ohne Datenbank aus. Eine Instanz betreut genau eine Wichtelrunde, die über eine Konfigurationsdatei definiert wird. Alle Daten liegen in einer JSON-Datei auf dem Server (siehe Abschnitt 7).
+**Leitprinzip: schlank.** Die App kommt ohne Datenbank aus. Die Runden werden in einer Konfigurationsdatei definiert; jede Runde hat eine eigene URL (`/de`, `/at`, `/ch`, `/it`) und eine eigene verschlüsselte JSON-Datei (siehe Abschnitt 7).
 
 ## 2. Problem & Ziele
 
@@ -28,13 +29,13 @@ Ein Wichteln per Post mit Listen, Losen und Gruppen-Chats ist aufwendig: Jemand 
 5. **Datensparsamkeit** und DSGVO-Konformität.
 
 ### Nicht-Ziele (für v1)
-- Kein Versand außerhalb Deutschlands.
+- Kein grenzüberschreitender Versand: Jede Runde ist auf ein Land beschränkt (DE, AT, CH, IT).
 - Keine Bezahl- oder Shop-Funktion (kein Weinkauf über die Plattform).
 - Keine Integration von Carrier-APIs zum Abruf des Sendungsstatus (nur Deep-Link auf die Tracking-Seite).
 - Keine Chat-Funktion zwischen Wichtelpartnern.
 - Keine nativen Apps.
 - Keine Datenbank (weder SQL noch NoSQL-Server), kein separates Admin-Backend zum Anlegen von Runden.
-- Keine Mandantenfähigkeit: eine Instanz = eine Runde.
+- Keine Mandantenfähigkeit: ein Organisator, mehrere Länder-Runden pro Instanz.
 
 ### Erfolgskennzahlen
 | Kennzahl | Ziel |
@@ -94,7 +95,7 @@ Phase 4: ABSCHLUSS
 | ID | Anforderung | Priorität |
 |---|---|---|
 | A-1 | Anmeldeformular mit Pflichtfeldern: Vorname, Nachname, E-Mail-Adresse, Straße, Hausnummer, PLZ, Ort. Optional: Adresszusatz (c/o, Etage, Firma), Hinweis für den Wichtel (z. B. „lieber Rotwein“, „kein Riesling“). | Muss |
-| A-2 | Land ist fest **Deutschland**. PLZ-Validierung: genau 5 Ziffern. Optional Plausibilisierung PLZ ↔ Ort. | Muss |
+| A-2 | Das Land ist durch die Runde festgelegt. PLZ-Validierung je Land: DE und IT 5 Ziffern, AT und CH 4 Ziffern. In Italien ist das Provinzkürzel (2 Buchstaben) Pflicht. | Muss |
 | A-3 | Packstation/Postfiliale ist zulässig (Felder: Postnummer, Packstation-Nr.), mit Hinweis, dass nicht alle Versanddienstleister an Packstationen liefern. | Soll |
 | A-4 | Pflicht-Checkboxen: Bestätigung „Ich bin mindestens 18 Jahre alt“ sowie Zustimmung zur Datenschutzerklärung und zur Weitergabe von Name und Adresse an den zugelosten Partner. | Muss |
 | A-5 | **Double-Opt-in:** Nach dem Absenden erhält der Teilnehmer eine E-Mail mit Bestätigungslink. Nur bestätigte Teilnehmer nehmen an der Auslosung teil. Bestätigungslink ist 48 h bzw. bis zum Anmeldeschluss gültig. | Muss |
@@ -130,7 +131,7 @@ Phase 4: ABSCHLUSS
 | ID | Anforderung | Priorität |
 |---|---|---|
 | V-1 | Im Dashboard sieht der Teilnehmer Adresse und Hinweis seines Partners sowie ein Formular „Versand melden“. | Muss |
-| V-2 | Pflichtfelder: Versanddienstleister (Auswahl: **DHL, UPS, Hermes, GLS, DPD**) und Sendungsnummer. | Muss |
+| V-2 | Pflichtfelder: Versanddienstleister und Sendungsnummer. Auswahl je Land: **DE** DHL, Hermes, DPD, GLS, UPS · **AT** Österreichische Post, DPD, GLS, DHL, UPS · **CH** Die Schweizerische Post, Planzer Paket, DPD, DHL, UPS, GLS · **IT** Poste Italiane, BRT, SDA, GLS, DHL, UPS. | Muss |
 | V-3 | Formatprüfung der Sendungsnummer je Dienstleister (Leerzeichen entfernen, Großbuchstaben). Eine nicht passende Nummer erzeugt einen Warnhinweis und kann bestätigt werden, statt hart abgelehnt zu werden, da Formate sich ändern. Richtwerte: siehe Anhang A. | Soll |
 | V-4 | Das System erzeugt aus Dienstleister und Nummer einen Tracking-Link (siehe Anhang A). | Muss |
 | V-5 | Nach dem Speichern erhält der **Empfänger** eine E-Mail „Dein Wichtel-Wein ist unterwegs 🍷“ mit Versanddienstleister, Sendungsnummer und Tracking-Link, **ohne** Namen des Absenders. | Muss |
@@ -147,6 +148,7 @@ Phase 4: ABSCHLUSS
 | E-3 | Erinnerungen werden pro Teilnehmer und Typ höchstens einmal versendet. Dafür wird am Teilnehmer in der Datendatei vermerkt, welche Erinnerungen bereits verschickt wurden. | Muss |
 | E-4 | Nach der letzten Erinnerung ohne Sendungsnummer erhält der Organisator eine Übersicht der säumigen Teilnehmer. | Soll |
 | E-5 | Optional: Empfänger kann im Dashboard „Wein angekommen“ bestätigen; der Absender erhält daraufhin eine anonyme Dankes-E-Mail. | Kann |
+| E-6 | **Aufdeckung:** Der Schenkende entscheidet im Dashboard (bis zum Aufdeckungszeitpunkt änderbar), ob der Empfänger erfahren darf, wer ihn beschenkt hat. Zum Aufdeckungszeitpunkt (`reveal_at`, Standard: Versandfrist) erhält der Empfänger eine E-Mail mit dem Namen, sofern zugestimmt und Versand gemeldet wurde. Standard: geheim. | Muss |
 
 Übersicht aller E-Mails:
 
@@ -161,6 +163,7 @@ Phase 4: ABSCHLUSS
 | M-8 | Erinnerungszeitpunkt ohne Sendungsnummer | Absender | Erinnerung mit Link zum Formular |
 | M-9 | Letzte Erinnerung erfolglos | Admin | Liste säumiger Teilnehmer |
 | M-10 | Teilnehmer fällt aus (siehe 5.7) | Betroffene | Neue Zuordnung |
+| M-11 | Aufdeckungszeitpunkt, Schenkender hat zugestimmt | Empfänger | Name des Schenkenden |
 
 ### 5.7 Organisator-Ansicht
 
@@ -219,7 +222,7 @@ Es gibt genau zwei Dateien:
 | Datei | Inhalt | Wer schreibt |
 |---|---|---|
 | `config.yaml` (+ Umgebungsvariablen für Secrets) | Rundendefinition, Fristen, Organisator-E-Mail, SMTP-Zugang | Organisator/Betreiber |
-| `data/round.json` (verschlüsselt) | Teilnehmer, Zuordnung, Sendungen, Versandvermerke | nur die App |
+| `data/<slug>.json.enc` (verschlüsselt, je Runde) | Teilnehmer, Zuordnung, Sendungen, Versandvermerke | nur die App |
 
 Nicht gespeichert werden: Login-Token (zustandslos signiert, L-1), Sitzungen (signiertes Cookie), Rate-Limit-Zähler (Arbeitsspeicher), E-Mail-Log (nur Vermerke am Teilnehmer).
 
@@ -258,12 +261,13 @@ base_url: "https://wichteln.example.org"
         "street": "Hauptstraße", "house_number": "12",
         "extra": null, "postal_code": "50667", "city": "Köln"
       },
-      "note_for_santa": "Gerne Rotwein",
+      "note": "Gerne Rotwein",
       "adult_confirmed": true,
       "consent_at": "2026-11-20T18:02:11+01:00",
       "email_confirmed_at": "2026-11-20T18:05:40+01:00",
       "removed_at": null,
       "giftee_id": "p_x7m1qd",
+      "reveal": false,
       "shipment": {
         "carrier": "DHL",
         "tracking_number": "00340434161234567890",
@@ -326,12 +330,12 @@ Die Oberfläche wird serverseitig gerendert (HTML-Formulare, wenig bzw. kein Jav
 
 ## 12. Offene Fragen
 
-1. **Hosting:** Wo läuft die Instanz (eigener Server/VPS, Container-Plattform mit persistentem Volume)? Plattformen ohne persistentes Dateisystem (rein serverlose Funktionen) scheiden mit dieser Architektur aus.
-2. **Anonymität:** Soll der Empfänger nach Abschluss der Runde erfahren dürfen, wer ihn beschenkt hat (optionale „Aufdeckung“)?
+1. ~~Hosting~~ → Strato, unter https://wichtelberg.steinforth.com. Offen: Ist es ein V-Server/Root-Server (Node.js möglich) oder Webhosting (kein dauerhaft laufender Prozess)?
+2. ~~Anonymität~~ → Optional, der Schenkende entscheidet (E-6).
 3. **Budget:** Nur als Empfehlung im Beschreibungstext oder als festes Feld?
 4. **Erinnerungen:** Reicht eine Erinnerung, oder sind standardmäßig zwei gewünscht? Sollen auch Teilnehmer erinnert werden, die ihre E-Mail-Adresse noch nicht bestätigt haben?
 5. **Weitere Versanddienstleister** (z. B. Deutsche Post Warenpost, „Sonstige“ mit Freitext)?
-6. **Mehrere Runden:** Reicht „eine Instanz pro Runde“, oder werden parallel mehrere Runden benötigt (dann eine Datendatei pro Runde)?
+6. ~~Mehrere Runden~~ → Ja, je eine Runde pro Land (DE, AT, CH, IT), jeweils mit eigener Datendatei. Offen: Sollen die Seiten für IT/CH auch auf Italienisch/Französisch erscheinen?
 7. **Ausfälle:** Wie wird verfahren, wenn ein Teilnehmer erst nach dem eigenen Empfang ausfällt (Wein erhalten, aber nicht verschickt)?
 8. **Branding/Domain** und Absender-E-Mail-Adresse.
 
