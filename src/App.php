@@ -134,19 +134,27 @@ final class App
         return $req->ip;
     }
 
-    /** CSRF-Schutz zusätzlich zu SameSite=Lax: Origin/Referer muss zur eigenen Domain passen. */
+    /**
+     * CSRF-Schutz zusätzlich zu SameSite=Lax: Origin (bzw. Referer) muss zur eigenen Domain passen.
+     * Verglichen wird der Host – mit base_url und mit dem Host der Anfrage selbst –, damit z. B.
+     * http/https oder ein Proxy davor nicht stören. "Origin: null" (Sandbox-iframes) wird abgelehnt.
+     */
     private function sameOrigin(Request $req): bool
     {
-        $u = parse_url($this->config->baseUrl);
-        $own = $u['scheme'] . '://' . $u['host'] . (isset($u['port']) ? ':' . $u['port'] : '');
-        if (isset($req->headers['origin'])) {
-            return $req->headers['origin'] === $own;
+        $hostOf = function (string $url): ?string {
+            $u = parse_url($url);
+            if (!$u || empty($u['host'])) {
+                return null;
+            }
+            return strtolower($u['host']) . (isset($u['port']) ? ':' . $u['port'] : '');
+        };
+        $allowed = array_filter([$hostOf($this->config->baseUrl), isset($req->headers['host']) ? strtolower($req->headers['host']) : null]);
+        $source = $req->headers['origin'] ?? $req->headers['referer'] ?? null;
+        if ($source === null) {
+            return true; // manche Clients senden keines von beiden; Cookie ist SameSite=Lax
         }
-        if (isset($req->headers['referer'])) {
-            $r = parse_url($req->headers['referer']);
-            return $r && ($r['scheme'] ?? '') . '://' . ($r['host'] ?? '') . (isset($r['port']) ? ':' . $r['port'] : '') === $own;
-        }
-        return true; // manche Clients senden keines von beiden; Cookie ist SameSite=Lax
+        $h = $hostOf($source);
+        return $h !== null && in_array($h, $allowed, true);
     }
 
     private function securityHeaders(Response $res): Response
@@ -154,7 +162,7 @@ final class App
         $res->headers += [
             'Content-Security-Policy' => "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
             'X-Content-Type-Options' => 'nosniff',
-            'Referrer-Policy' => 'no-referrer',
+            'Referrer-Policy' => 'same-origin', // "no-referrer" würde Browser zu "Origin: null" bei Formularen zwingen
             'X-Frame-Options' => 'DENY',
             'Cache-Control' => 'no-store',
         ];

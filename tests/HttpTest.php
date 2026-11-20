@@ -32,6 +32,11 @@ T::test('HTTP: Anmeldung → Bestätigung → Auslosung → Versand → Aufdecku
     T::eq(null, $env->service->findByEmail('person99@example.org'), 'Honeypot');
 
     T::eq(403, $env->req('POST', '/de/anmelden', sampleForm(1), [], ['origin' => 'https://evil.example'])->status, 'CSRF');
+    T::eq(403, $env->req('POST', '/de/anmelden', sampleForm(1), [], ['origin' => 'null'])->status, 'Origin null abgelehnt');
+    T::eq(200, $env->req('POST', '/de/login', ['email' => 'x@example.org'], [], ['origin' => 'https://localhost:8080'])->status, 'http/https egal');
+    T::eq(200, $env->req('POST', '/de/login', ['email' => 'x@example.org'], [], ['origin' => 'https://proxy.example', 'host' => 'proxy.example'])->status, 'eigener Host');
+    T::eq(403, $env->req('POST', '/de/login', ['email' => 'x@example.org'], [], ['origin' => 'https://evil.example', 'referer' => 'http://localhost:8080/de'])->status, 'Origin hat Vorrang vor Referer');
+    T::eq('same-origin', $env->req('GET', '/de')->headers['Referrer-Policy']);
 
     $cookies = [];
     for ($i = 1; $i <= 3; $i++) {
