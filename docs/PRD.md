@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | v0.3: schlanke Architektur ohne Datenbank, Länder-Runden DE/AT/CH/IT, optionale Aufdeckung |
+| **Status** | v0.4: PHP auf Strato-Webhosting, ohne Datenbank, Länder-Runden DE/AT/CH/IT, optionale Aufdeckung |
 | **URL** | https://wichtelberg.steinforth.com |
 | **Datum** | 20.11.2026 |
 | **Produkttyp** | Web-Anwendung (responsive, mobile-first) |
@@ -14,7 +14,7 @@
 
 Wichtelberg ist eine Web-Anwendung zur Organisation eines Wein-Wichtelns per Post. Teilnehmer melden sich bis zu einer festen Frist mit E-Mail-Adresse und einer Lieferadresse an. Es gibt je eine Runde pro Land (Deutschland, Österreich, Schweiz, Italien); innerhalb einer Runde wird nur im Inland verschickt. Nach Ablauf der Frist lost das System jedem Teilnehmer automatisch einen Wichtelpartner zu. Jeder Teilnehmer verschickt eine Flasche Wein an seinen Partner und hinterlegt Versanddienstleister und Sendungsnummer. Der Empfänger erhält daraufhin eine E-Mail mit dem Tracking-Link. Fehlt die Sendungsnummer bis zu einem Stichtag, verschickt das System eine Erinnerung.
 
-**Leitprinzip: schlank.** Die App kommt ohne Datenbank aus. Die Runden werden in einer Konfigurationsdatei definiert; jede Runde hat eine eigene URL (`/de`, `/at`, `/ch`, `/it`) und eine eigene verschlüsselte JSON-Datei (siehe Abschnitt 7).
+**Leitprinzip: schlank.** Die App ist in PHP ohne externe Abhängigkeiten geschrieben und läuft auf Strato-Webhosting. Sie kommt ohne Datenbank aus. Die Runden werden in einer Konfigurationsdatei (`config.php`) definiert; jede Runde hat eine eigene URL (`/de`, `/at`, `/ch`, `/it`) und eine eigene verschlüsselte JSON-Datei (siehe Abschnitt 7).
 
 ## 2. Problem & Ziele
 
@@ -83,7 +83,7 @@ Phase 4: ABSCHLUSS
 
 | ID | Anforderung | Priorität |
 |---|---|---|
-| R-1 | Die Runde wird in einer Konfigurationsdatei (z. B. `config.yaml`) bzw. über Umgebungsvariablen definiert: Name, Beschreibung (z. B. Budget-Empfehlung „ca. 15–25 €“), Anmeldeschluss (Datum + Uhrzeit, Zeitzone Europe/Berlin), Versandfrist, Erinnerungszeitpunkt(e), Mindestteilnehmerzahl, E-Mail-Adresse des Organisators. | Muss |
+| R-1 | Die Runde wird in der Konfigurationsdatei `config.php` (eine Runde pro Land) definiert: Name, Beschreibung (z. B. Budget-Empfehlung „ca. 15–25 €“), Anmeldeschluss (Datum + Uhrzeit, Zeitzone Europe/Berlin), Versandfrist, Erinnerungszeitpunkt(e), Mindestteilnehmerzahl, E-Mail-Adresse des Organisators. | Muss |
 | R-2 | Beim Start prüft die App die Konfiguration: Versandfrist nach Anmeldeschluss; Erinnerung zwischen Anmeldeschluss und Versandfrist. Ist die Konfiguration ungültig, startet die App nicht und meldet den Fehler. | Muss |
 | R-3 | Die Anmeldeseite ist unter der Start-URL der Instanz erreichbar, die der Organisator teilen kann. | Muss |
 | R-4 | Optional: Anmeldung nur mit Einladungscode (in der Konfiguration hinterlegt) oder nur für bestimmte E-Mail-Domains. | Kann |
@@ -116,7 +116,7 @@ Phase 4: ABSCHLUSS
 
 | ID | Anforderung | Priorität |
 |---|---|---|
-| D-1 | Die Auslosung startet automatisch zum Anmeldeschluss. Zeitgesteuerte Aufgaben laufen über einen einfachen In-Process-Scheduler oder einen Cron-Aufruf eines geschützten Endpunkts (z. B. stündlich `POST /tasks/run`), der alle fälligen Aufgaben anhand der Fristen und des gespeicherten Status ausführt. | Muss |
+| D-1 | Die Auslosung startet automatisch zum Anmeldeschluss. Zeitgesteuerte Aufgaben laufen über einen Strato-Cronjob (`cron.php`), einen Web-Cron bei Seitenaufrufen oder einen geschützten Endpunkt (`POST /tasks/run`), der alle fälligen Aufgaben anhand der Fristen und des gespeicherten Status ausführt. | Muss |
 | D-2 | Nur bestätigte Teilnehmer nehmen teil. Unbestätigte Anmeldungen werden verworfen. | Muss |
 | D-3 | Niemand wird sich selbst zugelost. | Muss |
 | D-4 | Algorithmus: zufällige Permutation der Teilnehmer, die als **ein einziger Kreis** verkettet wird (A → B → C → … → A). Damit funktioniert die Auslosung bei jeder Teilnehmerzahl ≥ 2, es gibt keine Selbstzuordnung und ab 3 Teilnehmern keine gegenseitigen Paare (A beschenkt B und B beschenkt A). Kryptografisch sicherer Zufallsgenerator. | Muss |
@@ -191,10 +191,10 @@ Bewusst minimal gehalten: eine einzige, geschützte Statusseite.
 ### 6.2 Sicherheit
 - HTTPS-only, HSTS.
 - Magic-Link-Token: zufällig, einmal verwendbar, gehasht gespeichert, kurze Gültigkeit.
-- Rate Limiting für Anmeldung und Login-Anfragen (Schutz vor Spam und E-Mail-Bombing; im Arbeitsspeicher gehalten), dazu Honeypot-Feld.
+- Rate Limiting für Anmeldung und Login-Anfragen (Schutz vor Spam und E-Mail-Bombing; Zähler gehasht in `data/ratelimit.json`), dazu Honeypot-Feld.
 - Zugriffsschutz: Ein Teilnehmer sieht ausschließlich die Adresse seines eigenen Partners.
-- Die Datendatei liegt außerhalb des Web-Roots, ist nur für den App-Prozess lesbar (Dateirechte 600) und wird verschlüsselt abgelegt (z. B. AES-GCM mit Schlüssel aus Umgebungsvariable) oder auf einem verschlüsselten Volume.
-- Server-Secret für Link-Signaturen und Datenschlüssel nur über Umgebungsvariablen, nie im Repository.
+- Die Datendateien liegen außerhalb des Web-Roots (zusätzlich per `.htaccess` gesperrt), haben die Dateirechte 600 und sind mit AES-256-GCM verschlüsselt.
+- Server-Secret und Datenschlüssel stehen nur in `config.php` außerhalb des Web-Roots, nie im Repository.
 - Keine Enumeration von E-Mail-Adressen (siehe A-6).
 
 ### 6.3 Zuverlässigkeit
@@ -211,8 +211,8 @@ Bewusst minimal gehalten: eine einzige, geschützte Statusseite.
 - Die Anmeldung muss in unter 2 Minuten möglich sein.
 
 ### 6.5 Performance & Skalierung
-- Ausgelegt für Runden mit 3 bis ca. 500 Teilnehmern; die gesamte Datendatei wird beim Start in den Arbeitsspeicher geladen (bei 500 Teilnehmern deutlich unter 1 MB).
-- Betrieb als **ein einzelner Prozess** (keine horizontale Skalierung, da die Datei der einzige Speicher ist), z. B. als Container mit gemountetem Volume.
+- Ausgelegt für Runden mit 3 bis ca. 500 Teilnehmern; die Datendatei wird pro Anfrage gelesen (bei 500 Teilnehmern deutlich unter 1 MB).
+- Betrieb auf Strato-Webhosting (Apache + PHP ≥ 8.1); gleichzeitige Anfragen werden über Dateisperren (`flock`) serialisiert.
 - Seitenaufbau < 2 s auf mobilem 4G.
 
 ## 7. Datenhaltung ohne Datenbank
@@ -221,30 +221,14 @@ Es gibt genau zwei Dateien:
 
 | Datei | Inhalt | Wer schreibt |
 |---|---|---|
-| `config.yaml` (+ Umgebungsvariablen für Secrets) | Rundendefinition, Fristen, Organisator-E-Mail, SMTP-Zugang | Organisator/Betreiber |
+| `config.php` | Runden, Fristen, Organisator-E-Mail, Mailversand, Schlüssel | Organisator/Betreiber |
 | `data/<slug>.json.enc` (verschlüsselt, je Runde) | Teilnehmer, Zuordnung, Sendungen, Versandvermerke | nur die App |
 
-Nicht gespeichert werden: Login-Token (zustandslos signiert, L-1), Sitzungen (signiertes Cookie), Rate-Limit-Zähler (Arbeitsspeicher), E-Mail-Log (nur Vermerke am Teilnehmer).
+Nicht gespeichert werden: Login-Token (zustandslos signiert, L-1), Sitzungen (signiertes Cookie), Rate-Limit-Zähler (nur gehasht in `data/ratelimit.json`), E-Mail-Log (nur Vermerke am Teilnehmer).
 
-### Beispiel `config.yaml`
+Vorlage mit allen Optionen: `config.example.php` im Repository.
 
-```yaml
-round:
-  name: "Wein-Wichteln 2026"
-  description: "Eine Flasche im Wert von ca. 15–25 €."
-  registration_deadline: "2026-12-01T23:59:00+01:00"
-  shipping_deadline: "2026-12-10T23:59:00+01:00"
-  reminders: ["2026-12-08T10:00:00+01:00", "2026-12-11T10:00:00+01:00"]
-  min_participants: 3
-  max_participants: null
-  invite_code: null
-  data_retention_days: 30
-organizer_email: "orga@example.org"
-base_url: "https://wichteln.example.org"
-# SMTP-Zugang, SECRET_KEY, DATA_KEY über Umgebungsvariablen
-```
-
-### Struktur `round.json`
+### Struktur einer Datendatei (entschlüsselt)
 
 ```json
 {
@@ -330,7 +314,7 @@ Die Oberfläche wird serverseitig gerendert (HTML-Formulare, wenig bzw. kein Jav
 
 ## 12. Offene Fragen
 
-1. ~~Hosting~~ → Strato, unter https://wichtelberg.steinforth.com. Offen: Ist es ein V-Server/Root-Server (Node.js möglich) oder Webhosting (kein dauerhaft laufender Prozess)?
+1. ~~Hosting~~ → Strato-Webhosting unter https://wichtelberg.steinforth.com. Darum PHP statt eines dauerhaft laufenden Prozesses; zeitgesteuerte Aufgaben laufen per Cronjob (`cron.php`) oder als Web-Cron bei Seitenaufrufen.
 2. ~~Anonymität~~ → Optional, der Schenkende entscheidet (E-6).
 3. **Budget:** Nur als Empfehlung im Beschreibungstext oder als festes Feld?
 4. **Erinnerungen:** Reicht eine Erinnerung, oder sind standardmäßig zwei gewünscht? Sollen auch Teilnehmer erinnert werden, die ihre E-Mail-Adresse noch nicht bestätigt haben?

@@ -1,0 +1,10 @@
+# Falls die Domain auf das Projektverzeichnis statt auf public/ zeigt:
+# alle Anfragen nach public/ umleiten. src/, data/ und config.php sind so nie direkt erreichbar.
+Options -Indexes
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(?!public/)(.*)$ public/$1 [L]
+</IfModule>
+<IfModule !mod_rewrite.c>
+  Require all denied
+</IfModule>
