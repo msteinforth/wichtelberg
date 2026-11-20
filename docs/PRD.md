@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Entwurf v0.1 |
+| **Status** | Entwurf v0.2 (schlanke Architektur ohne Datenbank) |
 | **Datum** | 20.11.2026 |
 | **Produkttyp** | Web-Anwendung (responsive, mobile-first) |
 | **Sprache** | Deutsch |
@@ -12,6 +12,8 @@
 ## 1. Zusammenfassung
 
 Wichtelberg ist eine Web-Anwendung zur Organisation eines Wein-Wichtelns per Post. Teilnehmer melden sich bis zu einer festen Frist mit E-Mail-Adresse und einer Lieferadresse in Deutschland an. Nach Ablauf der Frist lost das System jedem Teilnehmer automatisch einen Wichtelpartner zu. Jeder Teilnehmer verschickt eine Flasche Wein an seinen Partner und hinterlegt Versanddienstleister und Sendungsnummer. Der Empfänger erhält daraufhin eine E-Mail mit dem Tracking-Link. Fehlt die Sendungsnummer bis zu einem Stichtag, verschickt das System eine Erinnerung.
+
+**Leitprinzip: schlank.** Die App kommt ohne Datenbank aus. Eine Instanz betreut genau eine Wichtelrunde, die über eine Konfigurationsdatei definiert wird. Alle Daten liegen in einer JSON-Datei auf dem Server (siehe Abschnitt 7).
 
 ## 2. Problem & Ziele
 
@@ -31,6 +33,8 @@ Ein Wichteln per Post mit Listen, Losen und Gruppen-Chats ist aufwendig: Jemand 
 - Keine Integration von Carrier-APIs zum Abruf des Sendungsstatus (nur Deep-Link auf die Tracking-Seite).
 - Keine Chat-Funktion zwischen Wichtelpartnern.
 - Keine nativen Apps.
+- Keine Datenbank (weder SQL noch NoSQL-Server), kein separates Admin-Backend zum Anlegen von Runden.
+- Keine Mandantenfähigkeit: eine Instanz = eine Runde.
 
 ### Erfolgskennzahlen
 | Kennzahl | Ziel |
@@ -74,16 +78,16 @@ Phase 4: ABSCHLUSS
 
 ## 5. Funktionale Anforderungen
 
-### 5.1 Wichtelrunde verwalten (Organisator)
+### 5.1 Wichtelrunde konfigurieren (Organisator)
 
 | ID | Anforderung | Priorität |
 |---|---|---|
-| R-1 | Organisator kann eine Runde anlegen mit: Name, Beschreibung (z. B. Budget-Empfehlung „ca. 15–25 €“), Anmeldeschluss (Datum + Uhrzeit, Zeitzone Europe/Berlin), Versandfrist, Erinnerungszeitpunkt(e). | Muss |
-| R-2 | Validierung: Anmeldeschluss in der Zukunft; Versandfrist nach Anmeldeschluss; Erinnerung zwischen Auslosung und Versandfrist. | Muss |
-| R-3 | Pro Runde wird ein öffentlicher Anmelde-Link erzeugt (z. B. `/r/<slug>`), den der Organisator teilen kann. | Muss |
-| R-4 | Optional: Anmeldung nur mit Einladungscode oder nur für bestimmte E-Mail-Domains (z. B. Firmen-Wichteln). | Kann |
+| R-1 | Die Runde wird in einer Konfigurationsdatei (z. B. `config.yaml`) bzw. über Umgebungsvariablen definiert: Name, Beschreibung (z. B. Budget-Empfehlung „ca. 15–25 €“), Anmeldeschluss (Datum + Uhrzeit, Zeitzone Europe/Berlin), Versandfrist, Erinnerungszeitpunkt(e), Mindestteilnehmerzahl, E-Mail-Adresse des Organisators. | Muss |
+| R-2 | Beim Start prüft die App die Konfiguration: Versandfrist nach Anmeldeschluss; Erinnerung zwischen Anmeldeschluss und Versandfrist. Ist die Konfiguration ungültig, startet die App nicht und meldet den Fehler. | Muss |
+| R-3 | Die Anmeldeseite ist unter der Start-URL der Instanz erreichbar, die der Organisator teilen kann. | Muss |
+| R-4 | Optional: Anmeldung nur mit Einladungscode (in der Konfiguration hinterlegt) oder nur für bestimmte E-Mail-Domains. | Kann |
 | R-5 | Optional: maximale Teilnehmerzahl. | Kann |
-| R-6 | Fristen können bis zum Anmeldeschluss geändert werden; Teilnehmer werden bei Änderung per E-Mail informiert. | Soll |
+| R-6 | Fristen können vor dem Anmeldeschluss durch Ändern der Konfiguration und Neustart angepasst werden. | Kann |
 
 ### 5.2 Anmeldung (Teilnehmer)
 
@@ -103,21 +107,21 @@ Phase 4: ABSCHLUSS
 
 | ID | Anforderung | Priorität |
 |---|---|---|
-| L-1 | Kein Passwort. Zugang über **Magic Link** per E-Mail (Einmal-Token, Gültigkeit 30 Min., danach Sitzung per Cookie, 30 Tage). | Muss |
+| L-1 | Kein Passwort. Zugang über **Magic Link** per E-Mail. Die Links sind **zustandslos signiert** (HMAC mit Server-Secret, enthalten Teilnehmer-ID und Ablaufzeit), sodass keine Token gespeichert werden müssen. Gültigkeit 30 Min.; danach Sitzung per signiertem Cookie (30 Tage). | Muss |
 | L-2 | Alle E-Mails des Systems enthalten einen persönlichen Link zum Teilnehmer-Dashboard. | Muss |
-| L-3 | Organisator-Zugang ebenfalls per Magic Link; Admin-Rechte sind an die Runde gebunden. | Muss |
+| L-3 | Organisator-Zugang per Magic Link an die konfigurierte Organisator-E-Mail-Adresse. | Muss |
 
 ### 5.4 Auslosung
 
 | ID | Anforderung | Priorität |
 |---|---|---|
-| D-1 | Die Auslosung startet automatisch zum Anmeldeschluss (Scheduler/Job). Alternativ manuell durch den Organisator auslösbar. | Muss |
+| D-1 | Die Auslosung startet automatisch zum Anmeldeschluss. Zeitgesteuerte Aufgaben laufen über einen einfachen In-Process-Scheduler oder einen Cron-Aufruf eines geschützten Endpunkts (z. B. stündlich `POST /tasks/run`), der alle fälligen Aufgaben anhand der Fristen und des gespeicherten Status ausführt. | Muss |
 | D-2 | Nur bestätigte Teilnehmer nehmen teil. Unbestätigte Anmeldungen werden verworfen. | Muss |
 | D-3 | Niemand wird sich selbst zugelost. | Muss |
 | D-4 | Algorithmus: zufällige Permutation der Teilnehmer, die als **ein einziger Kreis** verkettet wird (A → B → C → … → A). Damit funktioniert die Auslosung bei jeder Teilnehmerzahl ≥ 2, es gibt keine Selbstzuordnung und ab 3 Teilnehmern keine gegenseitigen Paare (A beschenkt B und B beschenkt A). Kryptografisch sicherer Zufallsgenerator. | Muss |
-| D-5 | Mindestens **3** bestätigte Teilnehmer. Wird das Minimum verfehlt, findet keine Auslosung statt; Teilnehmer und Organisator werden informiert, der Organisator kann die Frist verlängern. | Muss |
+| D-5 | Mindestens **3** bestätigte Teilnehmer. Wird das Minimum verfehlt, findet keine Auslosung statt; Teilnehmer und Organisator werden informiert. Der Organisator kann die Frist in der Konfiguration verlängern. | Muss |
 | D-6 | Optional: Ausschlussregeln (z. B. Paare/Haushalte, die sich nicht gegenseitig beschenken sollen). Bei Ausschlüssen wird eine gültige Kreiszuordnung per Zufall mit Wiederholung bzw. Backtracking gesucht; ist keine möglich, wird der Organisator informiert. | Kann |
-| D-7 | Die Auslosung ist idempotent: Ein erneuter Job-Lauf erzeugt keine zweite Zuordnung. | Muss |
+| D-7 | Die Auslosung ist idempotent: Ist in der Datendatei bereits eine Zuordnung vorhanden, wird nicht erneut ausgelost. | Muss |
 | D-8 | Nach der Auslosung erhält jeder Teilnehmer eine E-Mail mit Vor- und Nachname, Lieferadresse und ggf. Hinweis seines Partners sowie der Versandfrist. | Muss |
 | D-9 | Die Zuordnung ist geheim: Empfänger erfahren nicht, wer sie beschenkt. Auch der Organisator sieht die Zuordnung standardmäßig nicht (nur im Ausnahmefall, siehe 5.7). | Muss |
 
@@ -140,7 +144,7 @@ Phase 4: ABSCHLUSS
 |---|---|---|
 | E-1 | Hat ein Teilnehmer zum Erinnerungszeitpunkt (Standard: 2 Tage vor Versandfrist) keine Sendungsnummer hinterlegt, erhält er eine Erinnerungs-E-Mail mit direktem Link zum Formular. | Muss |
 | E-2 | Optional zweite Erinnerung am Tag nach Ablauf der Versandfrist. | Soll |
-| E-3 | Erinnerungen werden pro Teilnehmer und Typ höchstens einmal versendet (Versand wird protokolliert). | Muss |
+| E-3 | Erinnerungen werden pro Teilnehmer und Typ höchstens einmal versendet. Dafür wird am Teilnehmer in der Datendatei vermerkt, welche Erinnerungen bereits verschickt wurden. | Muss |
 | E-4 | Nach der letzten Erinnerung ohne Sendungsnummer erhält der Organisator eine Übersicht der säumigen Teilnehmer. | Soll |
 | E-5 | Optional: Empfänger kann im Dashboard „Wein angekommen“ bestätigen; der Absender erhält daraufhin eine anonyme Dankes-E-Mail. | Kann |
 
@@ -151,7 +155,6 @@ Phase 4: ABSCHLUSS
 | M-1 | Anmeldung abgeschickt | Teilnehmer | Bestätigungslink (Double-Opt-in) |
 | M-2 | Anmeldung bestätigt | Teilnehmer | Bestätigung, Termine, Dashboard-Link |
 | M-3 | Login angefordert | Teilnehmer/Admin | Magic Link |
-| M-4 | Fristen geändert | Teilnehmer | Neue Termine |
 | M-5 | Auslosung erfolgt | Teilnehmer | Partner (Name, Adresse, Hinweis), Versandfrist |
 | M-6 | Auslosung nicht möglich | Teilnehmer, Admin | Zu wenig Teilnehmer, weiteres Vorgehen |
 | M-7 | Sendungsnummer eingetragen/geändert | Empfänger | Dienstleister, Nummer, Tracking-Link |
@@ -159,38 +162,43 @@ Phase 4: ABSCHLUSS
 | M-9 | Letzte Erinnerung erfolglos | Admin | Liste säumiger Teilnehmer |
 | M-10 | Teilnehmer fällt aus (siehe 5.7) | Betroffene | Neue Zuordnung |
 
-### 5.7 Organisator-Dashboard
+### 5.7 Organisator-Ansicht
+
+Bewusst minimal gehalten: eine einzige, geschützte Statusseite.
 
 | ID | Anforderung | Priorität |
 |---|---|---|
-| O-1 | Statusübersicht: Anzahl angemeldet / bestätigt / ausgelost / Versand gemeldet / angekommen. | Muss |
+| O-1 | Statusübersicht: Anzahl angemeldet / bestätigt / Versand gemeldet / angekommen. | Muss |
 | O-2 | Teilnehmerliste mit Status (bestätigt, Versand gemeldet ja/nein, Erinnerungen versendet), **ohne** Anzeige der Zuordnung. | Muss |
-| O-3 | Manuelle Erinnerung an einzelne Teilnehmer auslösen. | Soll |
-| O-4 | **Ausfall eines Teilnehmers nach der Auslosung:** Organisator entfernt Teilnehmer X. Im Kreis … → W → X → Y → … wird W direkt Y zugeordnet (W erhält M-10 mit neuer Adresse; Y erhält weiterhin Wein, nur von W). Hat X bereits verschickt oder W bereits an X verschickt, wird der Organisator darauf hingewiesen. | Soll |
-| O-5 | Einsicht in die Zuordnung nur über eine explizite Aktion „Zuordnung aufdecken“ mit Bestätigungsdialog; die Aktion wird protokolliert. | Kann |
-| O-6 | CSV-Export der Statusliste (ohne Zuordnung). | Kann |
+| O-3 | Manuelle Erinnerung an einzelne Teilnehmer auslösen. | Kann |
+| O-4 | **Ausfall eines Teilnehmers nach der Auslosung:** Organisator entfernt Teilnehmer X. Im Kreis … → W → X → Y → … wird W direkt Y zugeordnet (W erhält M-10 mit neuer Adresse). Hat X bereits verschickt oder W bereits an X verschickt, wird der Organisator darauf hingewiesen. | Soll |
+| O-5 | Die Zuordnung ist nicht über die Oberfläche einsehbar. Im Notfall kann der Betreiber sie der Datendatei entnehmen. | Muss |
 
 ## 6. Nicht-funktionale Anforderungen
 
 ### 6.1 Datenschutz & Recht
 - **DSGVO:** Datenschutzerklärung und Impressum. Rechtsgrundlage: Einwilligung (Art. 6 Abs. 1 lit. a) für die Weitergabe der Adresse an genau einen anderen Teilnehmer.
 - **Datensparsamkeit:** Es werden nur Daten erhoben, die für den Versand nötig sind. Kein Tracking, keine Analyse-Cookies; nur technisch notwendige Cookies.
-- **Löschkonzept:** Adressen, Sendungsnummern und Zuordnungen werden automatisch **30 Tage nach Versandfrist** gelöscht bzw. anonymisiert; der Wert ist pro Runde konfigurierbar. Teilnehmer können vor der Auslosung jederzeit selbst löschen.
+- **Löschkonzept:** Adressen, Sendungsnummern und Zuordnungen werden automatisch **30 Tage nach Versandfrist** gelöscht; der Wert ist konfigurierbar (`data_retention_days`). Teilnehmer können vor der Auslosung jederzeit selbst löschen.
 - **Hosting & E-Mail-Versand** in der EU, mit Auftragsverarbeitungsvertrag.
+- **Löschung technisch einfach:** Nach Ablauf der Löschfrist wird die Datendatei inklusive Backups gelöscht.
 - **Jugendschutz:** Altersbestätigung 18+ bei der Anmeldung. Hinweis, dass Alkohol nur an Erwachsene verschickt werden darf.
 - **Versandbedingungen:** Hinweis, dass die AGB des jeweiligen Versanddienstleisters für den Versand von Flüssigkeiten und Glas zu beachten sind.
 
 ### 6.2 Sicherheit
 - HTTPS-only, HSTS.
 - Magic-Link-Token: zufällig, einmal verwendbar, gehasht gespeichert, kurze Gültigkeit.
-- Rate Limiting für Anmeldung und Login-Anfragen (Schutz vor Spam und E-Mail-Bombing), dazu Honeypot-Feld bzw. datenschutzfreundliches CAPTCHA.
+- Rate Limiting für Anmeldung und Login-Anfragen (Schutz vor Spam und E-Mail-Bombing; im Arbeitsspeicher gehalten), dazu Honeypot-Feld.
 - Zugriffsschutz: Ein Teilnehmer sieht ausschließlich die Adresse seines eigenen Partners.
-- Adressdaten verschlüsselt gespeichert (at rest).
+- Die Datendatei liegt außerhalb des Web-Roots, ist nur für den App-Prozess lesbar (Dateirechte 600) und wird verschlüsselt abgelegt (z. B. AES-GCM mit Schlüssel aus Umgebungsvariable) oder auf einem verschlüsselten Volume.
+- Server-Secret für Link-Signaturen und Datenschlüssel nur über Umgebungsvariablen, nie im Repository.
 - Keine Enumeration von E-Mail-Adressen (siehe A-6).
 
 ### 6.3 Zuverlässigkeit
-- Zeitgesteuerte Jobs (Auslosung, Erinnerungen, Löschung) laufen über einen persistenten Scheduler. Ist ein Job verpasst worden, wird er nachgeholt.
-- E-Mail-Versand über eine Queue mit Retry, Logging von Bounces. Unzustellbare Adressen werden im Admin-Dashboard markiert.
+- Zeitgesteuerte Aufgaben sind zustandsbasiert statt ereignisbasiert: Bei jedem Lauf wird geprüft, was laut Fristen und Datendatei fällig ist (z. B. „Anmeldeschluss vorbei und noch keine Zuordnung → auslosen“). Verpasste Läufe werden so automatisch nachgeholt, ein eigener Job-Store ist nicht nötig.
+- Schreibzugriffe auf die Datendatei erfolgen **atomar** (in temporäre Datei schreiben, dann umbenennen) und serialisiert über eine Sperre (Mutex/Dateisperre), damit gleichzeitige Anmeldungen keine Daten überschreiben.
+- Tägliches Backup der Datendatei (verschlüsselt), das mit der Löschfrist ebenfalls entfernt wird.
+- E-Mail-Versand über einen SMTP- bzw. API-Dienst mit einfachem Retry. Der Status „versendet“ wird erst nach erfolgreicher Übergabe gesetzt.
 - E-Mails mit SPF, DKIM und DMARC, um Spam-Einstufung zu vermeiden. Bei der Anmeldung Hinweis, den Spam-Ordner zu prüfen.
 
 ### 6.4 Usability & Barrierefreiheit
@@ -200,71 +208,108 @@ Phase 4: ABSCHLUSS
 - Die Anmeldung muss in unter 2 Minuten möglich sein.
 
 ### 6.5 Performance & Skalierung
-- Ausgelegt für Runden mit 3 bis ca. 1.000 Teilnehmern.
+- Ausgelegt für Runden mit 3 bis ca. 500 Teilnehmern; die gesamte Datendatei wird beim Start in den Arbeitsspeicher geladen (bei 500 Teilnehmern deutlich unter 1 MB).
+- Betrieb als **ein einzelner Prozess** (keine horizontale Skalierung, da die Datei der einzige Speicher ist), z. B. als Container mit gemountetem Volume.
 - Seitenaufbau < 2 s auf mobilem 4G.
 
-## 7. Datenmodell (vereinfacht)
+## 7. Datenhaltung ohne Datenbank
 
+Es gibt genau zwei Dateien:
+
+| Datei | Inhalt | Wer schreibt |
+|---|---|---|
+| `config.yaml` (+ Umgebungsvariablen für Secrets) | Rundendefinition, Fristen, Organisator-E-Mail, SMTP-Zugang | Organisator/Betreiber |
+| `data/round.json` (verschlüsselt) | Teilnehmer, Zuordnung, Sendungen, Versandvermerke | nur die App |
+
+Nicht gespeichert werden: Login-Token (zustandslos signiert, L-1), Sitzungen (signiertes Cookie), Rate-Limit-Zähler (Arbeitsspeicher), E-Mail-Log (nur Vermerke am Teilnehmer).
+
+### Beispiel `config.yaml`
+
+```yaml
+round:
+  name: "Wein-Wichteln 2026"
+  description: "Eine Flasche im Wert von ca. 15–25 €."
+  registration_deadline: "2026-12-01T23:59:00+01:00"
+  shipping_deadline: "2026-12-10T23:59:00+01:00"
+  reminders: ["2026-12-08T10:00:00+01:00", "2026-12-11T10:00:00+01:00"]
+  min_participants: 3
+  max_participants: null
+  invite_code: null
+  data_retention_days: 30
+organizer_email: "orga@example.org"
+base_url: "https://wichteln.example.org"
+# SMTP-Zugang, SECRET_KEY, DATA_KEY über Umgebungsvariablen
 ```
-Round
-  id, slug, name, description,
-  registration_deadline, shipping_deadline, reminder_at[], 
-  min_participants (default 3), max_participants?, invite_code?,
-  status: DRAFT | OPEN | DRAWN | SHIPPING | CLOSED | CANCELLED,
-  data_retention_days (default 30), created_by (Admin)
 
-Participant
-  id, round_id, email (unique per round), first_name, last_name,
-  street, house_number, address_extra?, postal_code, city,
-  note_for_santa?, is_adult_confirmed, consent_at,
-  email_confirmed_at?, removed_at?
+### Struktur `round.json`
 
-Assignment
-  id, round_id, giver_id → Participant, receiver_id → Participant,
-  created_at, replaced_by?          -- für Ausfälle (O-4)
-  UNIQUE(round_id, giver_id), UNIQUE(round_id, receiver_id)
-
-Shipment
-  id, assignment_id, carrier: DHL | UPS | HERMES | GLS | DPD,
-  tracking_number, tracking_url, submitted_at, updated_at,
-  received_confirmed_at?
-
-EmailLog
-  id, participant_id, type (M-1 … M-10), sent_at, status, provider_message_id
-
-LoginToken
-  id, participant_id | admin_id, token_hash, expires_at, used_at?
+```json
+{
+  "version": 1,
+  "status": "OPEN",
+  "drawn_at": null,
+  "participants": [
+    {
+      "id": "p_8f3k2a",
+      "email": "anna@example.org",
+      "first_name": "Anna",
+      "last_name": "Muster",
+      "address": {
+        "street": "Hauptstraße", "house_number": "12",
+        "extra": null, "postal_code": "50667", "city": "Köln"
+      },
+      "note_for_santa": "Gerne Rotwein",
+      "adult_confirmed": true,
+      "consent_at": "2026-11-20T18:02:11+01:00",
+      "email_confirmed_at": "2026-11-20T18:05:40+01:00",
+      "removed_at": null,
+      "giftee_id": "p_x7m1qd",
+      "shipment": {
+        "carrier": "DHL",
+        "tracking_number": "00340434161234567890",
+        "submitted_at": "2026-12-05T09:12:00+01:00"
+      },
+      "received_at": null,
+      "mails_sent": ["CONFIRM", "WELCOME", "DRAW"]
+    }
+  ]
+}
 ```
+
+- Die Zuordnung ist als `giftee_id` am Schenkenden gespeichert; der Kreis ergibt sich durch Verfolgen der IDs. Der Tracking-Link wird bei Bedarf aus Carrier und Nummer erzeugt (Anhang A) und nicht gespeichert.
+- Die Eindeutigkeit der E-Mail-Adresse (A-6) und die Konsistenz der Zuordnung prüft die App beim Schreiben.
+- `version` erlaubt spätere Formatänderungen mit einfacher Migration beim Laden.
 
 ## 8. Statusmodell der Runde
 
 | Status | Bedeutung | Übergang |
 |---|---|---|
-| DRAFT | Angelegt, noch nicht veröffentlicht | Admin veröffentlicht → OPEN |
-| OPEN | Anmeldung möglich | Anmeldeschluss erreicht → Auslosung |
+| OPEN | Anmeldung möglich (Ausgangszustand bei leerer Datendatei) | Anmeldeschluss erreicht → Auslosung |
 | DRAWN / SHIPPING | Ausgelost, Versandphase | Versandfrist + Nachlauf → CLOSED |
-| CLOSED | Abgeschlossen, Löschfrist läuft | Löschfrist abgelaufen → Daten anonymisiert |
-| CANCELLED | Abgebrochen (z. B. zu wenig Teilnehmer) | Admin kann Frist verlängern → OPEN |
+| CLOSED | Abgeschlossen, Löschfrist läuft | Löschfrist abgelaufen → Datendatei und Backups gelöscht |
+| CANCELLED | Abgebrochen (z. B. zu wenig Teilnehmer) | Organisator verlängert Frist in der Konfiguration → OPEN |
 
 ## 9. Seitenübersicht
 
 | Seite | Zugriff | Inhalt |
 |---|---|---|
-| `/r/<slug>` | öffentlich | Beschreibung, Countdown, Anzahl Teilnehmer, Anmeldeformular |
-| `/r/<slug>/bestaetigt` | öffentlich | Bestätigung der E-Mail-Adresse |
+| `/` | öffentlich | Beschreibung, Countdown, Anzahl Teilnehmer, Anmeldeformular |
+| `/bestaetigen` | öffentlich | Bestätigung der E-Mail-Adresse |
 | `/login` | öffentlich | Magic Link anfordern |
 | `/dashboard` | Teilnehmer | Phase-abhängig: eigene Daten bearbeiten / Partneradresse + „Versand melden“ / Status eingehender Sendung |
-| `/admin/rounds` | Admin | Runden anlegen und verwalten |
-| `/admin/rounds/<id>` | Admin | Status, Teilnehmerliste, Aktionen |
+| `/admin` | Organisator | Status, Teilnehmerliste, Ausfall melden |
+| `POST /tasks/run` | geschützt (Secret) | Fällige Aufgaben ausführen (für Cron) |
 | `/datenschutz`, `/impressum` | öffentlich | Rechtstexte |
+
+Die Oberfläche wird serverseitig gerendert (HTML-Formulare, wenig bzw. kein JavaScript), um ohne Frontend-Build auszukommen.
 
 ## 10. Release-Planung
 
-**MVP (v1.0):** R-1 bis R-3, A-1, A-2, A-4 bis A-7, A-9, L-1 bis L-3, D-1 bis D-5, D-7 bis D-9, V-1, V-2, V-4, V-5, V-7, E-1, E-3, O-1, O-2 sowie die nicht-funktionalen Anforderungen.
+**MVP (v1.0):** R-1 bis R-3, Datenhaltung gemäß Abschnitt 7, A-1, A-2, A-4 bis A-7, A-9, L-1 bis L-3, D-1 bis D-5, D-7 bis D-9, V-1, V-2, V-4, V-5, V-7, E-1, E-3, O-1, O-2 sowie die nicht-funktionalen Anforderungen.
 
-**v1.1:** Formatprüfung der Sendungsnummern (V-3), Korrektur der Sendung (V-6), zweite Erinnerung und Admin-Eskalation (E-2, E-4), Ausfallbehandlung (O-4), Friständerung (R-6), Packstation (A-3).
+**v1.1:** Formatprüfung der Sendungsnummern (V-3), Korrektur der Sendung (V-6), zweite Erinnerung und Admin-Eskalation (E-2, E-4), Ausfallbehandlung (O-4), Packstation (A-3).
 
-**v1.2+:** Ausschlussregeln (D-6), Empfangsbestätigung (E-5), Einladungscode/Domain-Beschränkung (R-4), Export (O-6), Statusabfrage über Carrier-APIs.
+**v1.2+:** Ausschlussregeln (D-6), Empfangsbestätigung (E-5), Einladungscode/Domain-Beschränkung (R-4), manuelle Erinnerung (O-3).
 
 ## 11. Risiken
 
@@ -276,16 +321,19 @@ LoginToken
 | Bruch beim Transport | Enttäuschung | Verpackungshinweise im Dashboard |
 | Anonymität wird über Tracking oder Absenderangabe aufgehoben | Überraschung verdorben | Hinweis zur neutralen Absenderangabe; bewusst in Kauf genommen |
 | Fake- oder Spam-Anmeldungen | Verfälschte Auslosung | Double-Opt-in, Rate Limiting, optional Einladungscode |
+| Datendatei beschädigt oder verloren | Anmeldungen/Zuordnung weg | Atomares Schreiben, Sperre, tägliches Backup, Validierung beim Laden |
+| Gleichzeitige Schreibzugriffe | Verlorene Anmeldungen | Ein Prozess, serialisierte Schreibzugriffe |
 
 ## 12. Offene Fragen
 
-1. **Mehrere Runden / Mandanten:** Soll die App von beliebigen Organisatoren genutzt werden können (Self-Service), oder gibt es nur einen festen Organisator?
+1. **Hosting:** Wo läuft die Instanz (eigener Server/VPS, Container-Plattform mit persistentem Volume)? Plattformen ohne persistentes Dateisystem (rein serverlose Funktionen) scheiden mit dieser Architektur aus.
 2. **Anonymität:** Soll der Empfänger nach Abschluss der Runde erfahren dürfen, wer ihn beschenkt hat (optionale „Aufdeckung“)?
 3. **Budget:** Nur als Empfehlung im Beschreibungstext oder als festes Feld?
 4. **Erinnerungen:** Reicht eine Erinnerung, oder sind standardmäßig zwei gewünscht? Sollen auch Teilnehmer erinnert werden, die ihre E-Mail-Adresse noch nicht bestätigt haben?
 5. **Weitere Versanddienstleister** (z. B. Deutsche Post Warenpost, „Sonstige“ mit Freitext)?
-6. **Ausfälle:** Wie wird verfahren, wenn ein Teilnehmer erst nach dem eigenen Empfang ausfällt (Wein erhalten, aber nicht verschickt)?
-7. **Branding/Domain** und Absender-E-Mail-Adresse.
+6. **Mehrere Runden:** Reicht „eine Instanz pro Runde“, oder werden parallel mehrere Runden benötigt (dann eine Datendatei pro Runde)?
+7. **Ausfälle:** Wie wird verfahren, wenn ein Teilnehmer erst nach dem eigenen Empfang ausfällt (Wein erhalten, aber nicht verschickt)?
+8. **Branding/Domain** und Absender-E-Mail-Adresse.
 
 ---
 
