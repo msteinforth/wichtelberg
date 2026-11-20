@@ -70,6 +70,8 @@ T::test('Konfiguration: Normalisierung und Fehlermeldungen', function () {
     T::eq('2027-01-09T23:59:00+01:00', $c->rounds[0]->purgeAt->format(DATE_ATOM));
     T::eq($c->rounds[0]->shippingDeadline, $c->rounds[0]->revealAt, 'Aufdeckung standardmäßig zur Versandfrist');
     T::eq('Deutschland', $c->rounds[0]->countryName);
+    T::eq(Config::DEFAULT_BANNER, $c->banner, 'Banner standardmäßig an');
+    T::eq('', Config::build(rawConfig([], [], ['banner' => '']))->banner, 'Banner abschaltbar');
 
     T::throws(fn () => Config::build(rawConfig([], [rawConfig()['rounds'][0]])), fn ($e) => str_contains($e->getMessage(), 'doppelt'));
     T::throws(fn () => Config::build(rawConfig(['country' => 'FR'])), fn ($e) => str_contains($e->getMessage(), 'country'));

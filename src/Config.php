@@ -33,7 +33,10 @@ final class Round
 
 final class Config
 {
-    public const RESERVED_SLUGS = ['admin', 'style.css', 'healthz', 'tasks', 'datenschutz', 'impressum', 'index.php'];
+    /** Hinweisbanner über allen Seiten; per 'banner' => '' in config.php abschaltbar. */
+    public const DEFAULT_BANNER = 'Privates Wein-Wichteln der WhatsApp-Gruppe – keine Aktion von Lobenbergs Gute Weine.';
+
+    public const RESERVED_SLUGS = ['admin', 'style.css', 'healthz', 'tasks', 'datenschutz', 'impressum', 'index.php', 'fonts', 'favicon.ico', 'favicon.svg', 'favicon-32.png', 'apple-touch-icon.png', 'og-image.png'];
 
     public function __construct(
         /** @var Round[] */
@@ -53,6 +56,7 @@ final class Config
         public readonly string $legalImprint,
         public readonly string $secretKey,
         public readonly string $dataKey,
+        public readonly string $banner = '',
     ) {
     }
 
@@ -278,6 +282,7 @@ final class Config
             (string) ($legal['imprint'] ?? ''),
             $secretKey,
             $dataKey,
+            array_key_exists('banner', $raw) ? trim((string) $raw['banner']) : self::DEFAULT_BANNER,
         );
     }
 

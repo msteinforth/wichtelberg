@@ -14,6 +14,11 @@ T::test('HTTP: Anmeldung → Bestätigung → Auslosung → Versand → Aufdecku
     T::contains('href="/de"', $index->body);
     T::contains('href="/ch"', $index->body);
     T::contains("default-src 'none'", $index->headers['Content-Security-Policy']);
+    T::contains('class="banner"', $index->body);
+    T::contains('keine Aktion von Lobenbergs Gute Weine', $index->body);
+    T::contains('<meta property="og:image" content="http://localhost:8080/og-image.png">', $index->body);
+    T::contains('<link rel="icon" href="/favicon.svg"', $index->body);
+    T::contains('<meta property="og:title" content="Wichteln Schweiz">', $env->req('GET', '/ch')->body);
 
     $ch = $env->req('GET', '/ch');
     T::contains('Schweiz', $ch->body);

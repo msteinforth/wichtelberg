@@ -23,6 +23,9 @@ return [
         // 'smtp' => ['host' => 'smtp.strato.de', 'port' => 465, 'encryption' => 'ssl', 'username' => 'wichteln@steinforth.com', 'password' => ''],
     ],
 
+    // Hinweis ganz oben auf jeder Seite ('' = kein Banner)
+    'banner' => 'Privates Wein-Wichteln der WhatsApp-Gruppe – keine Aktion von Lobenbergs Gute Weine.',
+
     'legal' => [
         'operator' => "Vorname Nachname\nStraße 1, 12345 Ort\nE-Mail: orga@example.org",
         'imprint' => "Angaben gemäß § 5 DDG:\nVorname Nachname\nStraße 1, 12345 Ort\nE-Mail: orga@example.org",

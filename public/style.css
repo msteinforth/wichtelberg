@@ -28,6 +28,11 @@ body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 var(--sans)}
 a{color:var(--fg);text-underline-offset:3px}
 a:hover{color:var(--accent)}
 
+/* Hinweisbanner */
+.banner{background:var(--fg-strong);color:#e9e4dc;font-size:.85rem;line-height:1.4}
+.banner .wrap{padding-top:.55rem;padding-bottom:.55rem;text-align:center}
+.banner .wrap::before{content:"i";display:inline-block;width:1.15em;height:1.15em;line-height:1.15em;margin-right:.5em;border-radius:50%;background:var(--accent);color:#fff;font-weight:700;font-size:.8em;text-align:center;vertical-align:.08em;font-family:var(--serif)}
+
 /* Kopfbereich */
 .top{background:var(--bg);border-bottom:1px solid var(--line)}
 .top .wrap{display:flex;justify-content:space-between;align-items:center;gap:1rem;min-height:4.5rem;flex-wrap:wrap}

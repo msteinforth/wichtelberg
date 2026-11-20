@@ -44,6 +44,13 @@ final class Views
                 : '<a href="' . e("$base/login") . '">Anmelden</a>';
         }
         $site = $round ? $round->name : 'Wichtelberg';
+        /** @var Config $config */
+        $config = $ctx['config'];
+        $desc = $round
+            ? trim($round->name . ' – privates Wein-Wichteln per Post. ' . $round->description)
+            : 'Privates Wein-Wichteln per Post: anmelden, Wichtelpartner zugelost bekommen, eine Flasche Wein verschicken – und selbst überrascht werden.';
+        $pageUrl = $config->baseUrl . ($round ? $base : '/');
+        $banner = $config->banner !== '' ? '<div class="banner" role="note"><div class="wrap">' . e($config->banner) . '</div></div>' : '';
         return '<!doctype html>
 <html lang="de">
 <head>
@@ -51,9 +58,26 @@ final class Views
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>' . e($title) . ' · ' . e($site) . '</title>
+<meta name="description" content="' . e($desc) . '">
+<meta name="theme-color" content="#1c1918">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Wichtelberg">
+<meta property="og:locale" content="de_DE">
+<meta property="og:title" content="' . e($site) . '">
+<meta property="og:description" content="' . e($desc) . '">
+<meta property="og:url" content="' . e($pageUrl) . '">
+<meta property="og:image" content="' . e($config->baseUrl . '/og-image.png') . '">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Wichtelberg – Wein-Wichteln: Eine Flasche. Ein Los. Eine Überraschung.">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+' . $banner . '
 <header class="top"><div class="wrap">' . $brand . '<nav>' . $nav . '</nav></div></header>
 ' . $hero . '
 <main class="wrap">
