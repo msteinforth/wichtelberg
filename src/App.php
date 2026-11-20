@@ -152,7 +152,7 @@ final class App
     private function securityHeaders(Response $res): Response
     {
         $res->headers += [
-            'Content-Security-Policy' => "default-src 'none'; style-src 'self'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+            'Content-Security-Policy' => "default-src 'none'; style-src 'self'; font-src 'self'; img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
             'X-Content-Type-Options' => 'nosniff',
             'Referrer-Policy' => 'no-referrer',
             'X-Frame-Options' => 'DENY',

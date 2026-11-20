@@ -97,5 +97,5 @@ php tests/run.php
 ```
 ```bash
 cp config.example.php config.php    # base_url: http://localhost:8080, mail.transport: log, Schlüssel per php cli.php keys
-php -S localhost:8080 public/index.php
+php -S localhost:8080 -t public public/index.php
 ```

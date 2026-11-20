@@ -27,15 +27,14 @@ final class Views
         'CLOSED' => 'Abgeschlossen, Daten gelöscht',
     ];
 
-    public static function layout(array $ctx, string $title, string $body): string
+    public static function layout(array $ctx, string $title, string $body, string $hero = ''): string
     {
         $service = $ctx['service'] ?? null;
         $session = $ctx['session'] ?? null;
         $round = $service?->round;
         $base = $service?->base();
-        $brand = $round
-            ? '<a class="brand" href="' . e($base) . '">🍷 ' . e($round->name) . '</a>'
-            : '<a class="brand" href="/">🍷 Wichtelberg</a>';
+        $brand = '<a class="brand" href="' . e($round ? $base : '/') . '"><span class="brand-name">Wichtelberg</span><span class="brand-sub">'
+            . e($round ? $round->countryName : 'Wein-Wichteln') . '</span></a>';
         $nav = '';
         if (!empty($session['admin'])) {
             $nav = '<a href="/admin">Übersicht</a><form method="post" action="/admin/logout" class="inline"><button class="link">Abmelden</button></form>';
@@ -56,10 +55,11 @@ final class Views
 </head>
 <body>
 <header class="top"><div class="wrap">' . $brand . '<nav>' . $nav . '</nav></div></header>
+' . $hero . '
 <main class="wrap">
 ' . $body . '
 </main>
-<footer class="wrap foot"><a href="/">Alle Runden</a> · <a href="/datenschutz">Datenschutz</a> · <a href="/impressum">Impressum</a></footer>
+<footer class="foot"><div class="wrap"><a href="/">Alle Runden</a><a href="/datenschutz">Datenschutz</a><a href="/impressum">Impressum</a></div></footer>
 </body>
 </html>';
     }
@@ -126,15 +126,20 @@ final class Views
                 continue;
             }
             $state = $s->isRegistrationOpen() ? 'Anmeldung bis ' . Format::dateTime($s->round->registrationDeadline) : self::STATUS_LABEL[$s->status()];
-            $items .= '<li><a class="card round" href="' . e($s->base()) . '"><strong>' . e($s->round->name) . '</strong><span class="meta">Lieferadresse in '
-                . e($s->round->countryName) . ' · ' . e($state) . '</span></a></li>';
+            $items .= '<li><a class="round" href="' . e($s->base()) . '"><span><span class="kicker">' . e($s->round->name) . '</span><strong>'
+                . e($s->round->countryName) . '</strong></span><span><span class="meta">' . e($state) . '</span><br><span class="go">'
+                . ($s->isRegistrationOpen() ? 'Jetzt mitmachen' : 'Zur Runde') . '</span></span></a></li>';
         }
-        $body = '<section class="hero"><h1>Wein-Wichteln</h1>
-    <p>Melde Dich an, bekomme einen Wichtelpartner zugelost, verschicke eine Flasche Wein – und lass Dich selbst überraschen.</p></section>
-    <h2>Wähle Deine Runde</h2>'
+        $hero = '<section class="hero"><div class="wrap">
+      <span class="kicker">Wein-Wichteln per Post</span>
+      <h1>Eine Flasche.<br>Ein Los.<br>Eine Überraschung.</h1>
+      <p>Melde Dich an, bekomme einen Wichtelpartner zugelost und verschicke eine Flasche Wein, die Du selbst gern trinken würdest. Und dann: Lass Dich überraschen.</p>
+    </div></section>
+    <div class="tagline"><span class="kicker">Deutschland · Österreich · Schweiz · Italien</span></div>';
+        $body = '<h2>Wähle Deine Runde</h2>'
             . ($items ? "<ul class=\"rounds\">$items</ul>" : '<p class="notice">Aktuell gibt es keine Wichtelrunde.</p>')
-            . '<p><small>Organisator? <a href="/admin/login">Hier anmelden</a>.</small></p>';
-        return self::layout($ctx, 'Wein-Wichteln', $body);
+            . '<p class="meta">Organisator? <a href="/admin/login">Hier anmelden</a>.</p>';
+        return self::layout($ctx, 'Wein-Wichteln', $body, $hero);
     }
 
     public static function round(array $ctx, array $values = [], ?array $errors = null, ?string $message = null): string
@@ -154,8 +159,8 @@ final class Views
                     . self::field('E-Mail-Adresse', 'email', $values, $errors, ['type' => 'email', 'autocomplete' => 'email', 'maxlength' => 254])
                     . self::addressFields($r->country, $values, $errors)
                     . '<label class="hp" aria-hidden="true">Website<input name="website" tabindex="-1" autocomplete="off"></label>'
-                    . '<label class="check ' . (isset($errors['adult']) ? 'invalid' : '') . '"><input type="checkbox" name="adult"' . self::checked(($values['adult'] ?? '') === 'on') . '> Ich bin mindestens 18 Jahre alt.' . self::err($errors, 'adult') . '</label>'
-                    . '<label class="check ' . (isset($errors['consent']) ? 'invalid' : '') . '"><input type="checkbox" name="consent"' . self::checked(($values['consent'] ?? '') === 'on') . '> Ich habe die <a href="/datenschutz">Datenschutzerklärung</a> gelesen und bin einverstanden, dass mein Name, meine Adresse und mein Hinweis nach der Auslosung an meinen Wichtelpartner weitergegeben werden.' . self::err($errors, 'consent') . '</label>'
+                    . '<label class="check ' . (isset($errors['adult']) ? 'invalid' : '') . '"><input type="checkbox" name="adult"' . self::checked(($values['adult'] ?? '') === 'on') . '><span>Ich bin mindestens 18 Jahre alt.</span>' . self::err($errors, 'adult') . '</label>'
+                    . '<label class="check ' . (isset($errors['consent']) ? 'invalid' : '') . '"><input type="checkbox" name="consent"' . self::checked(($values['consent'] ?? '') === 'on') . '><span>Ich habe die <a href="/datenschutz">Datenschutzerklärung</a> gelesen und bin einverstanden, dass mein Name, meine Adresse und mein Hinweis nach der Auslosung an meinen Wichtelpartner weitergegeben werden.</span>' . self::err($errors, 'consent') . '</label>'
                     . '<button>Anmelden</button>'
                     . '<p><small>Du erhältst anschließend eine E-Mail mit einem Bestätigungslink. Bitte schau auch im Spam-Ordner nach.</small></p>'
                     . '</form>';
@@ -172,17 +177,17 @@ final class Views
         $meta = $status === 'OPEN'
             ? '<p class="meta">Anmeldeschluss: ' . e(Format::timeLeft($r->registrationDeadline, $service->now())) . ' · ' . $service->confirmedCount() . ' bestätigte Teilnehmer</p>'
             : '';
-        $body = '<section class="hero">
+        $hero = '<section class="hero"><div class="wrap">
+      <span class="kicker">Wein-Wichteln · Lieferadresse in ' . e($r->countryName) . '</span>
       <h1>' . e($r->name) . '</h1>
-      <p class="meta">Für Teilnehmer mit Lieferadresse in ' . e($r->countryName) . '</p>
       ' . ($r->description !== '' ? '<p>' . nl2brE($r->description) . '</p>' : '') . '
-      <ol class="steps">
-        <li>Bis <strong>' . e(Format::dateTime($r->registrationDeadline)) . '</strong> anmelden.</li>
-        <li>Danach wird ausgelost – Du erfährst per E-Mail, wen Du beschenkst.</li>
-        <li>Wein bis <strong>' . e(Format::dateTime($r->shippingDeadline)) . '</strong> verschicken und Sendungsnummer eintragen.</li>
-      </ol>' . $meta . '
-    </section>' . self::flash($message) . $content;
-        return self::layout($ctx, 'Wein-Wichteln', $body);
+    </div></section>';
+        $body = '<ol class="steps">
+        <li><strong>Anmelden</strong><br>bis ' . e(Format::dateTime($r->registrationDeadline)) . '</li>
+        <li><strong>Auslosung</strong><br>Du erfährst per E-Mail, wen Du beschenkst.</li>
+        <li><strong>Verschicken</strong><br>bis ' . e(Format::dateTime($r->shippingDeadline)) . ', dann Sendungsnummer eintragen.</li>
+      </ol>' . $meta . self::flash($message) . $content;
+        return self::layout($ctx, 'Wein-Wichteln', $body, $hero);
     }
 
     public static function message(array $ctx, string $title, string $text, ?array $link = null): string
@@ -234,7 +239,7 @@ final class Views
       <h2>Abmelden</h2>
       <form method="post" action="' . e("$base/dashboard/abmelden") . '" class="card">
         <p>Du kannst Deine Teilnahme bis zum Anmeldeschluss zurückziehen. Deine Daten werden dabei sofort gelöscht.</p>
-        <label class="check"><input type="checkbox" name="sure" required> Ja, ich möchte nicht mehr teilnehmen.</label>
+        <label class="check"><input type="checkbox" name="sure" required><span>Ja, ich möchte nicht mehr teilnehmen.</span></label>
         <button class="danger">Teilnahme zurückziehen</button>
       </form>';
             } else {
@@ -283,8 +288,8 @@ final class Views
                 . ($service->canChangeReveal()
                     ? '<form method="post" action="' . e("$base/dashboard/aufdecken") . '">
           <p>Soll Dein Wichtelpartner am <strong>' . e(Format::dateTime($r->revealAt)) . '</strong> erfahren, dass der Wein von Dir kam? Du kannst das bis dahin jederzeit ändern.</p>
-          <label class="check"><input type="radio" name="reveal" value="yes"' . self::checked((bool) $p['reveal']) . '> Ja, mein Name darf verraten werden.</label>
-          <label class="check"><input type="radio" name="reveal" value="no"' . self::checked(!$p['reveal']) . '> Nein, ich bleibe geheim.</label>
+          <label class="check"><input type="radio" name="reveal" value="yes"' . self::checked((bool) $p['reveal']) . '><span>Ja, mein Name darf verraten werden.</span></label>
+          <label class="check"><input type="radio" name="reveal" value="no"' . self::checked(!$p['reveal']) . '><span>Nein, ich bleibe geheim.</span></label>
           <button>Speichern</button></form>'
                     : '<p>' . ($p['reveal'] ? 'Du hast Dich zu erkennen gegeben.' : 'Du bleibst geheim.') . '</p>') . '
     </section>
